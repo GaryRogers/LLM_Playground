@@ -3,13 +3,16 @@
 Sends a query to a local LM Studio API and returns the response.
 
 .DESCRIPTION
-This script interacts with a local LM Studio server's API, sending a user query and optional context. It supports developer mode for raw output, logging with timestamps, and verbose/debug output. Context can be piped in or passed as a parameter. You can also control the maximum number of tokens sent to the LLM. The script checks if LM Studio is running before sending the query. Usage statistics can be optionally displayed.
+This script interacts with a local LM Studio server's API, sending a user query and optional context. It supports developer mode for raw output, logging with timestamps, and verbose/debug output. Context can be piped in or passed as a parameter, or provided from a text file. You can also control the maximum number of tokens sent to the LLM. The script checks if LM Studio is running before sending the query. Usage statistics can be optionally displayed. The -Context and -File parameters are mutually exclusive.
 
 .PARAMETER Query
 The user question or prompt to send to the LLM. Required. Can be provided positionally.
 
 .PARAMETER Context
-Optional. Additional context for the LLM, can be piped in or passed as a parameter. Objects are formatted for readability. Accepts string arrays or objects.
+Optional. Additional context for the LLM, can be piped in or passed as a parameter. Objects are formatted for readability. Accepts string arrays or objects. Cannot be used with -File.
+
+.PARAMETER File
+Optional. Path to a text-like file to use as context for the LLM. The file must exist and have a recognized text extension (e.g., .txt, .md, .json, etc.). Cannot be used with -Context.
 
 .PARAMETER Developer
 If specified, outputs the raw API response as JSON instead of just the LLM's answer.
@@ -31,6 +34,9 @@ PS> Get-Service | .\Ask-LMStudio.ps1 -Query "Which services are stopped?"
 
 .EXAMPLE
 PS> .\Ask-LMStudio.ps1 -Query "Summarize this text" -Context (Get-Content .\file.txt) -Verbose -LogFile .\log.txt -Usage
+
+.EXAMPLE
+PS> .\Ask-LMStudio.ps1 -Query "Summarize this file" -File .\file.txt -Verbose -LogFile .\log.txt -Usage
 
 .NOTES
 Requires LM Studio server running at http://localhost:1234
