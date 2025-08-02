@@ -112,14 +112,16 @@ $body = @{
     messages = $messages
 } | ConvertTo-Json -Depth 4
 
-# Check if LM Studio is running before sending the query
-Write-Log "Checking if LM Studio API is running at $apiUrl ..." -VerboseOnly
-$isLMStudioUp = $false
+# Check if LM Studio is running before sending the query (just check if port is open)
+Write-Log "Checking if LM Studio API port is open at $apiUrl ..." -VerboseOnly
+$uri = [System.Uri]$apiUrl
+$tcpClient = $null
 try {
-    $null = Invoke-RestMethod -Uri $apiUrl -Method Options -TimeoutSec 3
-    $isLMStudioUp = $true
+    $tcpClient = New-Object System.Net.Sockets.TcpClient
+    $tcpClient.Connect($uri.Host, $uri.Port)
+    $tcpClient.Close()
 } catch {
-    Write-Log "LM Studio API is not running or not reachable at $apiUrl. Please start LM Studio and try again."
+    Write-Log "LM Studio API port $($uri.Port) is not open on $($uri.Host). Please start LM Studio and try again."
     return
 }
 
