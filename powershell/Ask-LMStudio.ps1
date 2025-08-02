@@ -3,19 +3,25 @@
 Sends a query to a local LM Studio API and returns the response.
 
 .DESCRIPTION
-This script interacts with a local LM Studio server's API, sending a user query and optional context. It supports developer mode for raw output, logging with timestamps, and verbose/debug output. Context can be piped in or passed as a parameter.
+This script interacts with a local LM Studio server's API, sending a user query and optional context. It supports developer mode for raw output, logging with timestamps, and verbose/debug output. Context can be piped in or passed as a parameter. You can also control the maximum number of tokens sent to the LLM. The script checks if LM Studio is running before sending the query. Usage statistics can be optionally displayed.
 
 .PARAMETER Query
 The user question or prompt to send to the LLM. Required. Can be provided positionally.
 
 .PARAMETER Context
-Optional. Additional context for the LLM, can be piped in or passed as a parameter. Objects are formatted for readability.
+Optional. Additional context for the LLM, can be piped in or passed as a parameter. Objects are formatted for readability. Accepts string arrays or objects.
 
 .PARAMETER Developer
 If specified, outputs the raw API response as JSON instead of just the LLM's answer.
 
 .PARAMETER LogFile
 Optional. If specified, all output is also written to this file with timestamps.
+
+.PARAMETER MaxTokens
+Optional. The maximum number of tokens to send to the LLM (default: 100000). Used to limit the context length.
+
+.PARAMETER Usage
+If specified, displays usage statistics (model, prompt, completion, and total tokens) from the LM Studio API response.
 
 .EXAMPLE
 PS> .\Ask-LMStudio.ps1 "What is the weather in Omaha tomorrow?"
@@ -24,7 +30,7 @@ PS> .\Ask-LMStudio.ps1 "What is the weather in Omaha tomorrow?"
 PS> Get-Service | .\Ask-LMStudio.ps1 -Query "Which services are stopped?"
 
 .EXAMPLE
-PS> .\Ask-LMStudio.ps1 -Query "Summarize this text" -Context (Get-Content .\file.txt) -Verbose -LogFile .\log.txt
+PS> .\Ask-LMStudio.ps1 -Query "Summarize this text" -Context (Get-Content .\file.txt) -Verbose -LogFile .\log.txt -Usage
 
 .NOTES
 Requires LM Studio server running at http://localhost:1234
@@ -105,6 +111,17 @@ $body = @{
     model = "local-model"
     messages = $messages
 } | ConvertTo-Json -Depth 4
+
+# Check if LM Studio is running before sending the query
+Write-Log "Checking if LM Studio API is running at $apiUrl ..." -VerboseOnly
+$isLMStudioUp = $false
+try {
+    $null = Invoke-RestMethod -Uri $apiUrl -Method Options -TimeoutSec 3
+    $isLMStudioUp = $true
+} catch {
+    Write-Log "LM Studio API is not running or not reachable at $apiUrl. Please start LM Studio and try again."
+    return
+}
 
 # Send the POST request
 Write-Log "Sending POST request to $apiUrl with body: $body" -VerboseOnly
