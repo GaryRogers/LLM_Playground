@@ -38,8 +38,10 @@ Requires LM Studio server running at http://localhost:1234
 param(
     [Parameter(Mandatory=$true, Position=0)]
     [string]$Query,
-    [Parameter(ValueFromPipeline=$true)]
+    [Parameter(ValueFromPipeline=$true, ParameterSetName='Context')]
     [string[]]$Context,
+    [Parameter(ParameterSetName='File')]
+    [string]$File,
     [switch]$Developer,
     [string]$LogFile,
     [int]$MaxTokens = 100000,
@@ -71,10 +73,45 @@ function Write-Log {
 # Define the API endpoint
 $apiUrl = "http://localhost:1234/v1/chat/completions"
 
+
 # Prepare the request body as JSON
 $messages = @()
 $contextString = $null
-if ($PSBoundParameters.ContainsKey('Context') -and $Context) {
+if ($PSCmdlet.ParameterSetName -eq 'File' -and $File) {
+    Write-Log "File parameter detected: $File" -VerboseOnly
+    if (-not (Test-Path $File)) {
+        Write-Log "File '$File' does not exist. Aborting."
+        return
+    }
+    $fileItem = Get-Item $File
+    if ($fileItem.PSIsContainer) {
+        Write-Log "'$File' is a directory, not a file. Aborting."
+        return
+    }
+    $fileType = $fileItem.Extension.ToLower()
+    $textExtensions = @(".txt", ".md", ".csv", ".json", ".xml", ".log", ".ps1", ".py", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".yaml", ".yml")
+    if ($textExtensions -notcontains $fileType) {
+        Write-Log "File '$File' does not appear to be a text file (extension: $fileType). Aborting."
+        return
+    }
+    $contextString = Get-Content -Path $File -Raw
+    # Escape problematic characters
+    $contextString = $contextString -replace '`', '``'           # Escape backticks
+    $contextString = $contextString -replace '\u0000', ''        # Remove null chars
+    $contextString = $contextString -replace '\u001b', ''        # Remove ESC
+    $contextString = $contextString -replace '\r', ''            # Remove carriage returns (optional)
+    $contextString = $contextString -replace '\0', ''            # Remove literal nulls
+    $contextString = $contextString -replace '\$', '`$'          # Escape PowerShell variable sigil
+    $contextString = $contextString -replace '"', '`"'           # Escape double quotes
+    # Check context length (approximate MaxTokens tokens as MaxTokens*4 characters)
+    $maxTokenChars = $MaxTokens * 4
+    if ($contextString.Length -gt $maxTokenChars) {
+        Write-Log "File content exceeds $MaxTokens tokens (approx. $maxTokenChars chars). Truncating context sent to LLM."
+        $contextString = $contextString.Substring(0, $maxTokenChars)
+    }
+    Write-Log "Final context string from file: $contextString" -VerboseOnly
+    $messages += @{ role = "system"; content = $contextString }
+} elseif ($PSCmdlet.ParameterSetName -eq 'Context' -and $Context) {
     Write-Log "Context parameter detected." -VerboseOnly
     if ($Context -is [string[]]) {
         Write-Log "Context is string array. Joining with newlines." -VerboseOnly
@@ -103,7 +140,7 @@ if ($PSBoundParameters.ContainsKey('Context') -and $Context) {
     Write-Log "Final context string: $contextString" -VerboseOnly
     $messages += @{ role = "system"; content = $contextString }
 } else {
-    Write-Log "No context parameter provided." -VerboseOnly
+    Write-Log "No context or file parameter provided." -VerboseOnly
 }
 $messages += @{ role = "user"; content = $Query }
 
