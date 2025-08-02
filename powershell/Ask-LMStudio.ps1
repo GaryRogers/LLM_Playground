@@ -36,7 +36,8 @@ param(
     [string[]]$Context,
     [switch]$Developer,
     [string]$LogFile,
-    [int]$MaxTokens = 2048
+    [int]$MaxTokens = 100000,
+    [switch]$Usage
 )
 
 # Write-Log function for timestamped output and optional log file
@@ -119,6 +120,23 @@ try {
             Write-Log $response.choices[0].message.content
         } else {
             Write-Log "No message content found in response."
+        }
+        # Output usage stats if available and -Usage is set
+        if ($Usage -and $response.usage) {
+            $usageSummary = "Usage:"
+            if ($response.model) {
+                $usageSummary += " model=$($response.model)"
+            }
+            if ($response.usage.prompt_tokens) {
+                $usageSummary += ", prompt=$($response.usage.prompt_tokens)"
+            }
+            if ($response.usage.completion_tokens) {
+                $usageSummary += ", completion=$($response.usage.completion_tokens)"
+            }
+            if ($response.usage.total_tokens) {
+                $usageSummary += ", total=$($response.usage.total_tokens)"
+            }
+            Write-Log $usageSummary
         }
     }
 } catch {
